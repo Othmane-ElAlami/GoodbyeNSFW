@@ -24,6 +24,66 @@ function getSubColor(name) {
   return colors[Math.abs(hash) % colors.length];
 }
 
+// Module-level queue for serializing Reddit user details fetching to prevent 429 Rate Limits
+let requestQueue = [];
+let isProcessingQueue = false;
+
+async function processNextInQueue() {
+  if (isProcessingQueue || requestQueue.length === 0) return;
+  isProcessingQueue = true;
+
+  while (requestQueue.length > 0) {
+    const item = requestQueue[0]; // peek
+    if (item.cancelled) {
+      requestQueue.shift();
+      continue;
+    }
+    
+    try {
+      const result = await item.fetchFn();
+      if (!item.cancelled) {
+        item.resolve(result);
+      }
+    } catch (err) {
+      if (!item.cancelled) {
+        item.reject(err);
+      }
+    }
+    requestQueue.shift();
+    
+    // 500ms throttle to comply with Reddit rate limits
+    await new Promise(r => setTimeout(r, 500));
+  }
+
+  isProcessingQueue = false;
+}
+
+function enqueueRequest(fetchFn) {
+  let item;
+  let rejectPromise;
+  
+  const promise = new Promise((resolve, reject) => {
+    rejectPromise = reject;
+    item = {
+      fetchFn,
+      resolve,
+      reject,
+      cancelled: false,
+    };
+  });
+  
+  requestQueue.push(item);
+  processNextInQueue();
+  
+  return {
+    promise,
+    cancel: () => {
+      item.cancelled = true;
+      rejectPromise(new Error("Cancelled"));
+    }
+  };
+}
+
 export default function SubredditCard({ subreddit, isKept, onToggle }) {
   const { name, description, icon, subscribers } = subreddit;
   const topColor = getSubColor(name);
@@ -39,41 +99,57 @@ export default function SubredditCard({ subreddit, isKept, onToggle }) {
   const [loadingKarma, setLoadingKarma] = useState(false);
   
   const cardRef = useRef(null);
-  const isInView = useInView(cardRef, { once: true, margin: "200px" });
+  const isInView = useInView(cardRef, { margin: "200px" });
 
   useEffect(() => {
-    if (!isUser || !isInView) return;
+    if (!isUser || !isInView || karma !== null) return;
     
-    let isMounted = true;
+    let active = true;
+    let queueItem = null;
+    
     const fetchKarma = async () => {
+      const username = name.replace(/^u[_/]/, "");
+      const res = await fetch(`https://www.reddit.com/user/${username}/about.json`);
+      if (res.status === 429) {
+        throw new Error("Rate limited");
+      }
+      if (!res.ok) throw new Error("HTTP error " + res.status);
+      const json = await res.json();
+      if (!json || !json.data) throw new Error("No data");
+      return (json.data.link_karma || 0) + (json.data.comment_karma || 0);
+    };
+
+    const startFetching = async () => {
       setLoadingKarma(true);
       try {
-        const username = name.replace(/^u[_/]/, "");
-        const res = await fetch(`https://www.reddit.com/user/${username}/about.json`);
-        if (!res.ok) throw new Error();
-        const json = await res.json();
-        if (isMounted && json.data) {
-          const totalKarma = (json.data.link_karma || 0) + (json.data.comment_karma || 0);
+        queueItem = enqueueRequest(fetchKarma);
+        const totalKarma = await queueItem.promise;
+        if (active) {
           setKarma(totalKarma);
         }
       } catch (e) {
-        console.error('Error fetching karma for', name, e);
+        if (active && e.message !== "Cancelled") {
+          console.error('Error fetching karma for', name, e);
+        }
       } finally {
-        if (isMounted) setLoadingKarma(false);
+        setLoadingKarma(false);
       }
     };
     
     // Add a tiny random delay to avoid identical timestamp bursting
-    const delay = Math.random() * 300;
+    const delay = Math.random() * 150;
     const timer = setTimeout(() => {
-      if (isMounted) fetchKarma();
+      if (active) startFetching();
     }, delay);
     
     return () => { 
-      isMounted = false; 
+      active = false; 
       clearTimeout(timer);
+      if (queueItem) {
+        queueItem.cancel();
+      }
     };
-  }, [name, isUser, isInView]);
+  }, [name, isUser, isInView, karma]);
 
   return (
     <motion.div
