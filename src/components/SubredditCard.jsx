@@ -27,12 +27,19 @@ function getSubColor(name) {
 // Module-level queue for serializing Reddit user details fetching to prevent 429 Rate Limits
 let requestQueue = [];
 let isProcessingQueue = false;
+let queuePausedUntil = 0;
 
 async function processNextInQueue() {
   if (isProcessingQueue || requestQueue.length === 0) return;
   isProcessingQueue = true;
 
   while (requestQueue.length > 0) {
+    const now = Date.now();
+    if (now < queuePausedUntil) {
+      await new Promise(r => setTimeout(r, queuePausedUntil - now));
+      continue;
+    }
+
     const item = requestQueue[0]; // peek
     if (item.cancelled) {
       requestQueue.shift();
@@ -44,15 +51,23 @@ async function processNextInQueue() {
       if (!item.cancelled) {
         item.resolve(result);
       }
+      requestQueue.shift();
+      
+      // 1200ms throttle between successful requests to be safe
+      await new Promise(r => setTimeout(r, 1200));
     } catch (err) {
-      if (!item.cancelled) {
-        item.reject(err);
+      if (err.message === "Rate limited") {
+        console.warn("Reddit API rate limited. Pausing karma fetches for 10 seconds.");
+        queuePausedUntil = Date.now() + 10000;
+        await new Promise(r => setTimeout(r, 10000));
+      } else {
+        if (!item.cancelled) {
+          item.reject(err);
+        }
+        requestQueue.shift();
+        await new Promise(r => setTimeout(r, 500));
       }
     }
-    requestQueue.shift();
-    
-    // 500ms throttle to comply with Reddit rate limits
-    await new Promise(r => setTimeout(r, 500));
   }
 
   isProcessingQueue = false;
