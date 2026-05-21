@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "GoodbyeNSFW",
+  "version": "1.0.0",
+  "description": "Clean up your Reddit subscriptions quickly and safely.",
+  "permissions": [
+    "cookies",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://www.reddit.com/*",
+    "https://oauth.reddit.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Open GoodbyeNSFW"
+  }
+}
