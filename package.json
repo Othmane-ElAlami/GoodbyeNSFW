@@ -1,6 +1,6 @@
 {
   "name": "goodbyensfw",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Reddit NSFW Manager Extension",
   "type": "module",
   "scripts": {
