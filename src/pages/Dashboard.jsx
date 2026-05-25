@@ -6,6 +6,7 @@ import SubredditCard from '../components/SubredditCard';
 import LoadingState from '../components/LoadingState';
 import ConfirmModal from '../components/ConfirmModal';
 import ResultsPanel from '../components/ResultsPanel';
+import NsfwBlockerToggle from '../components/NsfwBlockerToggle';
 
 function decodeHtmlEntities(str) {
   if (!str) return '';
@@ -429,6 +430,11 @@ export default function Dashboard() {
             <span className="text-[#818384] text-xs uppercase font-bold">NSFW Found</span>
             <span className="text-[#ea0027] font-bold">{data.nsfwCount}</span>
           </div>
+        </div>
+
+        {/* V2 — Feed Blocker */}
+        <div className="mb-6">
+          <NsfwBlockerToggle />
         </div>
 
         {/* Results Panel */}

@@ -1,14 +1,16 @@
 {
   "manifest_version": 3,
   "name": "GoodbyeNSFW",
-  "version": "1.0.4",
-  "description": "Clean up your Reddit subscriptions quickly and safely.",
+  "version": "2.0.0",
+  "description": "Clean up your Reddit subscriptions and hide NSFW content from your feed.",
   "permissions": [
     "cookies",
-    "storage"
+    "storage",
+    "tabs"
   ],
   "host_permissions": [
     "https://www.reddit.com/*",
+    "https://old.reddit.com/*",
     "https://oauth.reddit.com/*"
   ],
   "background": {
@@ -16,5 +18,13 @@
   },
   "action": {
     "default_title": "Open GoodbyeNSFW"
-  }
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.reddit.com/*", "https://old.reddit.com/*"],
+      "js": ["content/nsfwBlocker.js"],
+      "css": ["content/nsfwBlocker.css"],
+      "run_at": "document_idle"
+    }
+  ]
 }

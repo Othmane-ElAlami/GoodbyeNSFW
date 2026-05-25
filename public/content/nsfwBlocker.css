@@ -1,0 +1,5 @@
+/* Fallback CSS-only hiding as a safety net */
+body.nsfw-blocker-active shreddit-post[nsfw="true"],
+body.nsfw-blocker-active .link.over18 {
+  display: none !important;
+}
