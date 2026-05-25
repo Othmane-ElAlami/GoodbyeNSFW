@@ -7,6 +7,19 @@ import LoadingState from '../components/LoadingState';
 import ConfirmModal from '../components/ConfirmModal';
 import ResultsPanel from '../components/ResultsPanel';
 
+function decodeHtmlEntities(str) {
+  if (!str) return '';
+  return str
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&#x2F;/g, '/')
+    .replace(/&nbsp;/g, ' ');
+}
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
@@ -68,8 +81,8 @@ export default function Dashboard() {
           return {
             name: t.display_name,
             fullName: t.name,
-            title: t.title || t.display_name,
-            description: t.public_description || t.description || '',
+            title: decodeHtmlEntities(t.title || t.display_name),
+            description: decodeHtmlEntities(t.public_description || t.description || ''),
             icon: t.icon_img || (t.community_icon ? t.community_icon.split('?')[0] : ''),
             headerImg: t.header_img || (t.banner_background_image ? t.banner_background_image.split('?')[0] : ''),
             subscribers: t.subreddit_type === 'user' || t.display_name?.startsWith('u_')
@@ -511,10 +524,11 @@ export default function Dashboard() {
               </button>
             </div>
             <div className="card-grid">
-              {filteredNsfw.map(sub => (
+              {filteredNsfw.map((sub, idx) => (
                 <SubredditCard
                   key={sub.fullName}
                   subreddit={sub}
+                  index={idx}
                   isKept={selectedToKeep.has(sub.fullName)}
                   onToggle={() => toggleKeep(sub.fullName)}
                 />

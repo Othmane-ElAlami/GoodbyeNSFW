@@ -49,15 +49,19 @@ export default function ConfirmModal({
             Subreddits to remove
           </p>
           <div className="space-y-1.5">
-            {items.map((sub) => (
-              <div
-                key={sub.name}
-                className="flex items-center gap-2 text-sm text-[#d7dadc]"
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-[#ea0027] flex-shrink-0" />
-                <span className="truncate">r/{sub.name}</span>
-              </div>
-            ))}
+            {items.map((sub) => {
+              const isUser = sub.name.startsWith("u_") || sub.name.startsWith("u/");
+              const displayName = isUser ? `u/${sub.name.replace(/^u[_/]/, "")}` : `r/${sub.name}`;
+              return (
+                <div
+                  key={sub.name}
+                  className="flex items-center gap-2 text-sm text-[#d7dadc]"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#ea0027] flex-shrink-0" />
+                  <span className="truncate">{displayName}</span>
+                </div>
+              );
+            })}
           </div>
         </div>
 

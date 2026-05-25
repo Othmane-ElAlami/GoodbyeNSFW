@@ -64,21 +64,25 @@ export default function ResultsPanel({ results, onBack }) {
             Detailed Results
           </p>
           <div className="space-y-2">
-            {items.map((item) => (
-              <div key={item.name} className="flex items-center gap-2 text-sm">
-                {item.success ? (
-                  <FaCheckCircle className="text-emerald-400 flex-shrink-0" />
-                ) : (
-                  <FaTimesCircle className="text-rose-400 flex-shrink-0" />
-                )}
-                <span className="text-slate-300 truncate">r/{item.name}</span>
-                {item.error && (
-                  <span className="text-xs text-rose-400/60 truncate ml-auto">
-                    {item.error}
-                  </span>
-                )}
-              </div>
-            ))}
+            {items.map((item) => {
+              const isUser = item.name.startsWith("u_") || item.name.startsWith("u/");
+              const displayName = isUser ? `u/${item.name.replace(/^u[_/]/, "")}` : `r/${item.name}`;
+              return (
+                <div key={item.name} className="flex items-center gap-2 text-sm">
+                  {item.success ? (
+                    <FaCheckCircle className="text-emerald-400 flex-shrink-0" />
+                  ) : (
+                    <FaTimesCircle className="text-rose-400 flex-shrink-0" />
+                  )}
+                  <span className="text-slate-300 truncate">{displayName}</span>
+                  {item.error && (
+                    <span className="text-xs text-rose-400/60 truncate ml-auto">
+                      {item.error}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
 

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "GoodbyeNSFW",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Clean up your Reddit subscriptions quickly and safely.",
   "permissions": [
     "cookies",

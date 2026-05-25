@@ -40,9 +40,8 @@ async function processNextInQueue() {
       continue;
     }
 
-    const item = requestQueue[0]; // peek
+    const item = requestQueue.shift(); // remove immediately to prevent index shifting issues
     if (item.cancelled) {
-      requestQueue.shift();
       continue;
     }
     
@@ -51,7 +50,6 @@ async function processNextInQueue() {
       if (!item.cancelled) {
         item.resolve(result);
       }
-      requestQueue.shift();
       
       // 1200ms throttle between successful requests to be safe
       await new Promise(r => setTimeout(r, 1200));
@@ -59,12 +57,15 @@ async function processNextInQueue() {
       if (err.message === "Rate limited") {
         console.warn("Reddit API rate limited. Pausing karma fetches for 10 seconds.");
         queuePausedUntil = Date.now() + 10000;
+        
+        // Put the item back at the front of the queue so it retries
+        requestQueue.unshift(item);
+        
         await new Promise(r => setTimeout(r, 10000));
       } else {
         if (!item.cancelled) {
           item.reject(err);
         }
-        requestQueue.shift();
         await new Promise(r => setTimeout(r, 500));
       }
     }
@@ -73,7 +74,7 @@ async function processNextInQueue() {
   isProcessingQueue = false;
 }
 
-function enqueueRequest(fetchFn) {
+function enqueueRequest(fetchFn, index = 0) {
   let item;
   let rejectPromise;
   
@@ -83,11 +84,18 @@ function enqueueRequest(fetchFn) {
       fetchFn,
       resolve,
       reject,
+      index,
       cancelled: false,
     };
   });
   
-  requestQueue.push(item);
+  // Insert item into requestQueue sorted by index ascending
+  let insertIndex = 0;
+  while (insertIndex < requestQueue.length && requestQueue[insertIndex].index < index) {
+    insertIndex++;
+  }
+  requestQueue.splice(insertIndex, 0, item);
+  
   processNextInQueue();
   
   return {
@@ -99,7 +107,7 @@ function enqueueRequest(fetchFn) {
   };
 }
 
-export default function SubredditCard({ subreddit, isKept, onToggle }) {
+export default function SubredditCard({ subreddit, index, isKept, onToggle }) {
   const { name, description, icon, subscribers } = subreddit;
   const topColor = getSubColor(name);
 
@@ -137,7 +145,7 @@ export default function SubredditCard({ subreddit, isKept, onToggle }) {
     const startFetching = async () => {
       setLoadingKarma(true);
       try {
-        queueItem = enqueueRequest(fetchKarma);
+        queueItem = enqueueRequest(fetchKarma, index);
         const totalKarma = await queueItem.promise;
         if (active) {
           setKarma(totalKarma);
