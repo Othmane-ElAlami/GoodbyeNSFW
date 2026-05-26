@@ -2,21 +2,38 @@ import { useState, useEffect } from 'react';
 
 export default function Popup() {
   const [blockerEnabled, setBlockerEnabled] = useState(false);
-  const [injected, setInjected] = useState(null); // null = not on Reddit, true/false = detection result
+  const [injected, setInjected] = useState(null);
+  const [hiddenCount, setHiddenCount] = useState(0);
+  const [isRedditTab, setIsRedditTab] = useState(false);
 
   useEffect(() => {
     chrome.storage.local.get('nsfwBlockerEnabled', ({ nsfwBlockerEnabled }) => {
       setBlockerEnabled(!!nsfwBlockerEnabled);
     });
 
-    // Check if content script is injected in the active tab
+    // Check active tab
     chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
       if (tab?.url?.includes('reddit.com')) {
+        setIsRedditTab(true);
+
+        // Ping content script
         chrome.tabs.sendMessage(tab.id, { type: 'NSFW_PING' }, (res) => {
-          setInjected(chrome.runtime.lastError ? false : res?.loaded === true);
+          if (chrome.runtime.lastError) {
+            setInjected(false);
+          } else {
+            setInjected(res?.loaded === true);
+          }
+        });
+
+        // Get hidden count
+        chrome.tabs.sendMessage(tab.id, { type: 'NSFW_GET_COUNT' }, (res) => {
+          if (!chrome.runtime.lastError && res?.count != null) {
+            setHiddenCount(res.count);
+          }
         });
       } else {
-        setInjected(null); // not on Reddit
+        setIsRedditTab(false);
+        setInjected(null);
       }
     });
   }, []);
@@ -25,6 +42,11 @@ export default function Popup() {
     const next = !blockerEnabled;
     setBlockerEnabled(next);
     chrome.storage.local.set({ nsfwBlockerEnabled: next });
+
+    if (!next) {
+      setHiddenCount(0);
+    }
+
     chrome.tabs.query(
       { url: ['*://www.reddit.com/*', '*://old.reddit.com/*'] },
       (tabs) => tabs.forEach(tab =>
@@ -36,6 +58,14 @@ export default function Popup() {
   const openDashboard = () => {
     chrome.tabs.create({ url: chrome.runtime.getURL('index.html') });
   };
+
+  const statusText = blockerEnabled
+    ? (hiddenCount > 0
+        ? `● Active — ${hiddenCount} NSFW post${hiddenCount !== 1 ? 's' : ''} hidden`
+        : '● Active — hiding NSFW posts')
+    : '○ Off';
+
+  const statusColor = blockerEnabled ? '#46d160' : '#818384';
 
   return (
     <div style={{
@@ -75,13 +105,10 @@ export default function Popup() {
         padding: '12px 14px',
         marginBottom: 10,
       }}>
-        <div>
+        <div style={{ minWidth: 0, flex: 1, marginRight: 12 }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: '#d7dadc' }}>🛡 NSFW Feed Blocker</div>
-          <div style={{ fontSize: 12, color: '#818384', marginTop: 3 }}>
-            {blockerEnabled
-              ? <span style={{ color: '#46d160' }}>● Active — hiding NSFW posts</span>
-              : <span style={{ color: '#818384' }}>○ Off</span>
-            }
+          <div style={{ fontSize: 12, marginTop: 3, color: statusColor }}>
+            {statusText}
           </div>
         </div>
         <div
@@ -114,7 +141,7 @@ export default function Popup() {
         </div>
       </div>
 
-      {/* Debug status — only shown on Reddit tabs */}
+      {/* Content script status — only shown on Reddit tabs */}
       {injected !== null && (
         <div style={{
           fontSize: 11,
