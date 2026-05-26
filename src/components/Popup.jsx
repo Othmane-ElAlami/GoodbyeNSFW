@@ -3,20 +3,20 @@ import { useState, useEffect } from 'react';
 export default function Popup() {
   const [blockerEnabled, setBlockerEnabled] = useState(false);
   const [injected, setInjected] = useState(null);
-  const [hiddenCount, setHiddenCount] = useState(0);
+  const [sessionCount, setSessionCount] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
   const [isRedditTab, setIsRedditTab] = useState(false);
 
   useEffect(() => {
-    chrome.storage.local.get('nsfwBlockerEnabled', ({ nsfwBlockerEnabled }) => {
-      setBlockerEnabled(!!nsfwBlockerEnabled);
+    chrome.storage.local.get(['nsfwBlockerEnabled', 'nsfwTotalBlocked'], (result) => {
+      setBlockerEnabled(!!result.nsfwBlockerEnabled);
+      setTotalCount(result.nsfwTotalBlocked || 0);
     });
 
-    // Check active tab
     chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
       if (tab?.url?.includes('reddit.com')) {
         setIsRedditTab(true);
 
-        // Ping content script
         chrome.tabs.sendMessage(tab.id, { type: 'NSFW_PING' }, (res) => {
           if (chrome.runtime.lastError) {
             setInjected(false);
@@ -25,10 +25,10 @@ export default function Popup() {
           }
         });
 
-        // Get hidden count
-        chrome.tabs.sendMessage(tab.id, { type: 'NSFW_GET_COUNT' }, (res) => {
-          if (!chrome.runtime.lastError && res?.count != null) {
-            setHiddenCount(res.count);
+        chrome.tabs.sendMessage(tab.id, { type: 'NSFW_GET_STATS' }, (res) => {
+          if (!chrome.runtime.lastError && res) {
+            setSessionCount(res.session || 0);
+            setTotalCount(res.total || 0);
           }
         });
       } else {
@@ -44,7 +44,7 @@ export default function Popup() {
     chrome.storage.local.set({ nsfwBlockerEnabled: next });
 
     if (!next) {
-      setHiddenCount(0);
+      setSessionCount(0);
     }
 
     chrome.tabs.query(
@@ -59,9 +59,15 @@ export default function Popup() {
     chrome.tabs.create({ url: chrome.runtime.getURL('index.html') });
   };
 
+  const formatCount = (n) => {
+    if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+    if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
+    return String(n);
+  };
+
   const statusText = blockerEnabled
-    ? (hiddenCount > 0
-        ? `● Active — ${hiddenCount} NSFW post${hiddenCount !== 1 ? 's' : ''} hidden`
+    ? (sessionCount > 0
+        ? `● Active — ${sessionCount} post${sessionCount !== 1 ? 's' : ''} hidden this page`
         : '● Active — hiding NSFW posts')
     : '○ Off';
 
@@ -140,6 +146,44 @@ export default function Popup() {
           }} />
         </div>
       </div>
+
+      {/* Stats Row */}
+      {blockerEnabled && (
+        <div style={{
+          display: 'flex',
+          gap: 8,
+          marginBottom: 10,
+        }}>
+          <div style={{
+            flex: 1,
+            background: '#272729',
+            borderRadius: 8,
+            padding: '8px 10px',
+            textAlign: 'center',
+          }}>
+            <div style={{ fontSize: 18, fontWeight: 700, color: '#FF4500' }}>
+              {formatCount(sessionCount)}
+            </div>
+            <div style={{ fontSize: 10, color: '#818384', marginTop: 2, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              This page
+            </div>
+          </div>
+          <div style={{
+            flex: 1,
+            background: '#272729',
+            borderRadius: 8,
+            padding: '8px 10px',
+            textAlign: 'center',
+          }}>
+            <div style={{ fontSize: 18, fontWeight: 700, color: '#d7dadc' }}>
+              {formatCount(totalCount)}
+            </div>
+            <div style={{ fontSize: 10, color: '#818384', marginTop: 2, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              All time
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Content script status — only shown on Reddit tabs */}
       {injected !== null && (

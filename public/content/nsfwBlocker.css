@@ -1,7 +1,5 @@
 /* Fallback CSS-only hiding as a safety net */
-body.nsfw-blocker-active shreddit-post[nsfw],
-body.nsfw-blocker-active shreddit-post[over-18],
-body.nsfw-blocker-active shreddit-post[is-nsfw],
+body.nsfw-blocker-active article:has(shreddit-content-tags[nsfw]),
 body.nsfw-blocker-active .link.over18 {
   display: none !important;
 }
