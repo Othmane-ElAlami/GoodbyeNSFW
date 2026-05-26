@@ -17,7 +17,8 @@
     "service_worker": "background.js"
   },
   "action": {
-    "default_title": "Open GoodbyeNSFW"
+    "default_popup": "popup.html",
+    "default_title": "GoodbyeNSFW"
   },
   "content_scripts": [
     {
